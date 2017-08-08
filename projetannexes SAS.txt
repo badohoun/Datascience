@@ -1,0 +1,73 @@
+libname lib "E:\Users\Espoir\Documents\SAS";
+
+
+/*Modif des données*/
+data data (rename=(Year=Annee month=Mois Bill=Facture CONSUMPTION=Consommation SIZE=Taille METER=Metre PUMP1=Pompe1 PUMP2=Pompe2 RIDER=Riders)); 
+set lib.electricbill;
+	NUMQUAL= input(num, best12.);
+	*transformer les degrés en C°;
+	Temperature=(5/9)*(temp-32);
+	format Temperature 4.1;
+	*corriger l'erreur de saisie en décembre 92;
+	if num = 24 then year=1992;
+	*créer une var qui contient mois et année;
+	a=mod(num,12);
+	if a=0 then a=12;
+	Date=mdy(a,1,year);
+	format Date mmyys10.;
+	drop a;
+	if num=37 then bill = 154.57; *remplacement de la valeur manquante;
+	if num in (104,105) then bill = 76.66; *remplacement de la valeur nulle;
+run;
+
+
+proc means data = data mean std min max median; *valeur manquante ...;
+var facture temperature hdd cdd taille riders consommation;
+run;
+
+goption i=join;
+proc gplot data = data;   *On remarque une forte saisonalité ;
+plot facture * date=7 /skipmiss;
+run;
+*une valeur 0 alors qu'il y a de la consommation d'éléctricité, mais changement de compteur à cette date ! ;
+
+goption i=join;
+proc gplot data = data (rename=(bill=Facture consumption=Consommation) where=(month="Sep" )) ;   *On remarque une forte saisonalité ;
+plot facture * date=7 /skipmiss legend;
+plot2 Consommation * date=5 /legend;
+run;
+
+proc gchart data = data;
+vbar taille /discrete;
+run;
+
+
+/* moyennes annuelles et mensuelles des factures */
+proc means data=data;
+var bill; class year; run;
+proc means data=data;
+var bill; class month; run;
+/*moyennes en fonction du nombre de personnes dans le foyer */
+proc means data=data;
+var bill; class size; run;
+/* factures moyennes avant et après l'installation du nouveau compteur */
+proc means data=data;
+var bill; class meter; run;
+
+
+/* Etude des corrélations */
+proc corr data = data; 
+var facture temperature hdd cdd taille riders consommation;
+run;
+
+proc reg data = data ;
+model bill=consumption;
+run;
+
+
+
+/* test de normalité */
+proc univariate data = data all normal plot;
+var Facture Consommation;
+histogram Facture Consommation /normal (color=red W=5);
+run;
