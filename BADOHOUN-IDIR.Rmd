@@ -1,0 +1,276 @@
+---
+title: 'Projet : Analyse de Données2'
+author: "BADOHOUN IDIR"
+date: "25 avril 2018"
+output:
+  pdf_document:
+    latex_engine: lualatex
+  html_document: default
+---
+
+author: "BADOHOUN IDIR"
+title: 'Projet : Analyse de Donnees2'
+date: "25 avril 2018"
+# INTRODUCTION
+
+
+Nous avons vu en cours des méthodes pour faire l'analyse de données allant de la collecte
+des donnees , nettoyage des données à l'analyse exploratoire des donnees .
+
+Dans ce projet Notre analyse portera sur  un ensemble de données de qualité de l'air .
+Il contient  les reponses d'un dispositif multicapteur a gaz deploye  dans une ville italienne. 
+
+
+L'ensemble de donnees contient 9358 occurrences de reponses horaires moyennes d'un ensemble de 5 capteurs chimiques d'oxyde metallique incorpores dans un dispositif multicapteur chimique de qualite de l'air.
+L'appareil etait situe sur le terrain dans une zone fortement polluee, au niveau de la route, 
+dans une ville italienne.
+Les donnees ont ete enregistrees de mars 2004 à fevrier 2005 (un an).
+
+cela  représente les enregistrements les plus longs disponibles gratuitement des réponses des dispositifs de detection chimique de qualité de l'air déployés sur le terrain. 
+
+les deux premieres variable donnent la date et l'heure ,les 10 suivantes representent des concentrations de produit chimique dans l 'air,T la temperature,RH et AH representent respectivement l'humidite relative et absolue. 
+
+##1  Extraction des données:
+
+la recupération d'un jeu de donnees depuis le site et chargement de donnees 
+Le jeu de donnees se trouve sur le site "https://archive.ics.uci.edu/ml/datasets/Air+quality".
+Ce site contient des données etudies dans les centres d'apprentissage automatiques.
+Ce site repertorie tous les jeux de donnees d'interet en fonction des problematiques en 
+machine learning : regression, classification notamment .
+A noter que nous allons utiliser le package tidyverse et ses differentes fonctions dans le cadre
+de notre analyse .
+
+
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+td <- tempdir() 
+ tf <- tempfile(tmpdir=td, fileext=".zip") 
+ download.file("https://archive.ics.uci.edu/ml/machine-learning-databases/00360/AirQualityUCI.zip", tf) 
+ fname <- unzip(tf, list=TRUE)$Name[1] 
+ unzip(tf, files=fname, exdir=td, overwrite=TRUE) 
+ fpath <- file.path(td, fname)
+ data <-read.csv2(fpath)
+
+head(data,10)
+```
+
+
+
+##2  Mise en forme  sous format tibble et préparation du jeu de données:
+
+
+les donnees d'entrees doivent etre traites avant de les utiliser dans notre analyse exploratoire .
+Cela signifie supprimer des lignes sans valeurs , verifier la corrélation et les valeurs aberrantes.
+Lors de la construction du modèle, R prend en charge les valeurs nulles et supprime les lignes ou les donnees  manquantes . Cela entraine une eventuelle perte des donnees et donc d'information.
+Nous utilisons ici dans notre analyse des tibbles et non des dataframes habituels pour notre jeu de donnees car les tibbles presente une methode d'impression raffinee qui montre seulement les 10 premieres lignes, 
+et toutes les colonnes qui correspondent à l'ecran. 
+Cela rend beaucoup plus facile le travail avec  des donnees de grandes dimensions . 
+En plus de son nom, chaque colonne rapporte son type, une belle caracteristique empruntee à la fonction str .
+
+  
+```{r ,echo=TRUE}
+ data=as.tibble(data)
+str(data)
+```
+
+
+
+Nettoyage des donnees:
+En regardant de plus pres notre tibble on se rend compte de l'existence de plusieurs lignes(de 9358 jusqu'a 9471) et colonnes (les 2 dernieres) completements vides.
+Dans la description du jeu de donnees , la valeur -200 a eté atribuee a toutes les mesures aberrantes,on va remplacer ces dernieres par la moyenne de la variable.
+```{r ,echo=TRUE}
+
+data=data[-c(9358:9471),-c(16,17)]
+
+for(i in 3:dim(data)[2])
+
+ data[which(data[,i]==-200),i]=sum(data[ - which(data[,i]==(-200)),i])/dim(data[ - which(data[,i]==(-200)),i])[1]
+  
+
+
+
+```
+
+
+
+##3    Differentes formes de visualisations rapides de nos donnees en utilisant la librairie des graphiques ggplot et quelques unes de ses pallettes intéressantes dans le cadre de notre analyse 
+
+```{r}
+
+
+Date1=as.Date.character(format = "%d/%m/%Y" ,x = data$Date )
+data=mutate(data,mois=format(Date1, format="%m"))
+data=mutate(data,jour=format(Date1, format="%d"))
+
+month5=filter(data,mois=="05")
+
+month5
+ggplot(data = month5) + 
+  geom_point(mapping = aes(x = jour, y = T), position = "jitter",color="blue")
+
+
+ggplot(data = data , mapping = aes(x =mois, y = T)) + 
+  geom_boxplot() 
+
+```
+
+
+on a pris comme sous echantillons les donnees du mois de mai,et visualiser la temperature selon jour,on apprend que du 4 au 10 mai ete les jours les plus frais de mai.
+
+On constate l'augmentation de la temperature en ete comme attendue.
+
+
+
+
+```{r}
+barmois <- ggplot(data = data) + 
+  geom_bar(
+    mapping = aes(x = mois, fill = mois), 
+    show.legend = FALSE,
+    width = 1
+  ) + 
+  theme(aspect.ratio = 1) +
+  labs(x = NULL, y = NULL)
+barmois + coord_flip()
+barmois + coord_polar()
+
+
+
+ggplot(data = data) + 
+  geom_point(mapping = aes(x = T, y = CO.GT.,color=mois))
+
+
+
+
+
+
+```
+ .
+On remarque que la concentration du CO explose en hiver.
+
+4    Analyse  exploratoire  et Visualisation des donnees 
+
+
+
+Dans cette section nous allons utiliser la visualisation et la transformation pour explorer 
+les donnees : c'est une etape  indispensable dans toute analyse statistique .
+Cela nous permettra par ailleurs  de résoudre des  questions sur nos donnees .
+En effet on se pose des questions si les donnees répondent à nos attentes ou non .
+Nous allons donc deployer tous les outils de l'analyse exploratoire des donnees :
+la visualisation , la transformation et la modelisation .
+Chaque variable dans notre jeu de donnees  a son propre modèle de variation, elle  peut  nous reveler des informations interessantes.
+La meilleure façon de comprendre ce modele est de visualiser la distribution des valeurs de la variable.
+
+
+4.1 La corrélation entre les variables 
+
+On commence par regarder les correlations entre les variables 
+On utilise une bibliothèque en plus ici qui nous donne une meilleure réprésentation des correlations entre les variables indépendantes c'est la bibliotheque corrplot 
+Avant de passer a la visualisation entre les variables certaines transformations sont nécessaires on cree deux  nouvelles colonnes contenant les jours et les mois numerotes à l'aide de la la fonction mutate .
+
+
+
+```{r}
+library(corrplot)
+
+data$jour=as.numeric(data$jour)
+data$mois=as.numeric(data$mois)
+
+corrplot(cor(data[,c(3,13,15,16,17)]),method='circle') 
+
+
+```
+le graphique ci dessus nous montre les differentes correlations entre nos variables principales,et on en deduit l'inexistance de correlation entre elles (a part entre la temperature et l'humidite )
+
+
+
+
+
+##4.2    Analyse  exploratoire  des donnees 
+
+
+
+Dans cette section nous allons utiliser la visualisation et la transformation pour explorer 
+les donnees : c'est une etape  indispensable dans toute analyse statistique .
+Cela nous permettra par ailleurs  de resoudre des  questions sur nos donnees .
+En effet on se pose des questions si les donnees repondent à nos attentes ou non .
+Nous allons donc deployer tous les outils de l'analyse exploratoire des donnees :
+la visualisation , la transformation et la modelisation .
+Chaque variable dans notre jeu de données  a son propre modele de variation, elle  peut  nous reveler des informations interessantes.
+
+
+
+La façon dont on  visualise  la distribution d'une variable depend de la nature de la variable, qu'elle soit categorielle ou continue. Pour examiner la distribution d'une variable categorielle, on utilise un graphique a barres: c'est ce que nous faisons avec la variable température ici dans notre analyse .
+La hauteur des barres indique combien d'observations se sont produites avec chaque valeur x.
+Ici on le calcule aussi manuellement .
+
+Par ailleurs pour examiner la distribution d'une variable continue, on utilise un histogramme.
+On fait de meme le calcul manuellement en combinant cut et count .
+
+On remarque par ailleurs que les temperatures tournent autour de 20.
+
+Ici on a zoomer sur les faibles temperatures  en choisissant les températures inferieures à 3
+Nous avons aussi superposer plusieurs histogrammes dans le meme trace.
+
+Pour rendre la tendance plus facile à voir nous pouvons reorganiser le mois en fonction de la valeur mediane de la  variables de concentration co.gt .
+
+```{r}
+
+data %>%
+  count(mois)
+
+ggplot(data = data) +
+  geom_histogram(mapping = aes(x = T), binwidth = 2)
+
+data %>% 
+  count(cut_width(T, 5))
+
+petiteT  <-data %>% 
+  filter(T <3)
+
+ggplot(data = petiteT, mapping = aes(x = T, colour = mois)) +
+  geom_freqpoly(binwidth = 0.1)
+
+ggplot(data =data) +
+  geom_boxplot(mapping = aes(x = reorder(mois, CO.GT., FUN = median), y =CO.GT.))
+
+ggplot(data = data, mapping = aes(x = T, y = CO.GT. )) + 
+  geom_boxplot(mapping = aes(group = cut_width(T, 5)))
+```
+
+##5 REGRESSION LINEAIRE :
+voyons l'effet de la temperature ,l'humidite, la saison et l'heure sur la concentration du CO en mg/m^3 (CO.GT) en effectuant une regression lineaire.
+Avant cela on va creer une nouvelle variable 'weekend' qui aura comme valeur TRUE si c'est un jour de weekend et False si c'est un jour de semaine,sachant que les donnees on eté recoltees en 2004 et que le jour de l'an est un jeudi.
+
+```{r}
+
+X=c()
+X=(   (data$jour-3)%%7==0      |    (data$jour-3)%%7==1     )
+data=mutate(data,weekend=as.numeric(X))
+data[,c(1,18)]
+```
+
+```{r}
+Model_lm1=lm(CO.GT.~T+as.factor(weekend)+RH+as.numeric(data$Time),data=data)
+summary(Model_lm1)
+
+```
+Avant d'interpreter les resultats,on va essayer d'optimiser notre modele:
+Le critere d'information Akaike (AIC) est une mesure de la qualite relative des modeles statistiques pour un ensemble donne de donnees. Etant donne une collection de modeles pour les donnees, AIC estime la qualite de chaque modele, par rapport à chacun des autres modeles. Par consequent, AIC fournit un moyen de selection de modele.
+
+```{r}
+
+Model_lm_best=step(Model_lm1)
+```
+```{r}
+summary(Model_lm_best)
+plot(Model_lm_best)[1]
+plot(Model_lm_best)[2]
+plot(Model_lm_best)[3]
+plot(Model_lm_best)[4]
+
+```
+On conclue de cette analyse que la concentration du CO dans l'air est influencee par la temperature ,l'humidite et le moment de la journee, en revanche. il n'y a pas d'effet week-end/jr de semaine  sur la concentration du CO.
